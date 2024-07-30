@@ -53,8 +53,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
           console.log('Step execution completed:', result);
           isExecutingStep = false;
           sendResponse({ status: "Step executed", result: result });
-          // After executing a step and before getting the next step, get the page content
-          chrome.runtime.sendMessage({ action: "getPageContent" });
+          chrome.runtime.sendMessage({ action: "getNextStep" });
         })
         .catch(error => {
           console.error('Error in executeStep:', error);

@@ -1,50 +1,48 @@
-const DASHSCOPE_API_KEY = '';
+const DASHSCOPE_API_KEY = 'your-dashscope-api-key';
 
 let currentTask = null;
 let currentStep = 0;
 let currentUrl = '';
 let taskCompleted = false;
+let isTaskRunning = false;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Background script received message:', request);
 
   if (request.action === "startTask") {
-    currentTask = request.task;
-    currentStep = 0;
-    currentUrl = request.url;
-    taskCompleted = false;
-    getNextStep();
-    sendResponse({status: "Task started"});
+    if (!isTaskRunning) {
+      currentTask = request.task;
+      currentStep = 0;
+      currentUrl = request.url;
+      taskCompleted = false;
+      isTaskRunning = true;
+      getNextStep();
+      sendResponse({status: "Task started"});
+    } else {
+      sendResponse({status: "A task is already running"});
+    }
   } else if (request.action === "getNextStep") {
-    if (!taskCompleted) {
+    if (isTaskRunning && !taskCompleted) {
       getNextStep();
       sendResponse({status: "Getting next step"});
-    } else {
+    } else if (taskCompleted) {
       sendResponse({status: "Task already completed"});
+    } else {
+      sendResponse({status: "No task is currently running"});
     }
   } else if (request.action === "updateUrl") {
     currentUrl = request.url;
-    if (!taskCompleted) {
+    if (isTaskRunning && !taskCompleted) {
       getNextStep();
     }
-    sendResponse({status: "URL updated, continuing task"});
+    sendResponse({status: "URL updated"});
   }
 
   return true;  // Indicates we will send a response asynchronously
 });
 
-// Add a listener for tab updates
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url !== currentUrl) {
-    currentUrl = tab.url;
-    if (!taskCompleted) {
-      getNextStep();
-    }
-  }
-});
-
 function getNextStep() {
-  if (taskCompleted) return;
+  if (!isTaskRunning || taskCompleted) return;
 
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
     if (chrome.runtime.lastError) {
@@ -71,6 +69,7 @@ function getNextStep() {
           console.log('API call result:', result);
           if (result.instructions.toLowerCase().includes('task completed')) {
             taskCompleted = true;
+            isTaskRunning = false;
             chrome.tabs.sendMessage(tabs[0].id, {
               action: "executeStep",
               instruction: "Task Completed"
