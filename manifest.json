@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Simple Multi-on (Qwen Version)",
+  "version": "1.0",
+  "description": "A simple AI-powered web automation Chrome extension using Qwen API",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "https://dashscope.aliyuncs.com/",
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ]
+}
