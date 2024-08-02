@@ -50,6 +50,8 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       statusDiv.textContent = 'Task step executed successfully. Results: ' + (request.result || 'No detailed results available');
     } else if (request.action === "error") {
       statusDiv.textContent = 'Error: ' + (request.error || 'Unknown error');
+    } else if (request.action === "taskCompleted") {
+      statusDiv.textContent = 'Task completed successfully!';
     }
   }
   sendResponse({status: "Message received by popup"});

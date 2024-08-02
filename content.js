@@ -1,10 +1,18 @@
-window.addEventListener('load', function() {
-  chrome.runtime.sendMessage({action: "updateUrl", url: window.location.href});
-});
-
 console.log('Content script loaded');
 
 let isExecutingStep = false;
+
+// Ensure script runs after page is fully loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', afterDOMLoaded);
+} else {
+  afterDOMLoaded();
+}
+
+function afterDOMLoaded() {
+  console.log('DOM fully loaded');
+  chrome.runtime.sendMessage({action: "updateUrl", url: window.location.href});
+}
 
 function getPageStructure() {
   const structure = [];
@@ -40,6 +48,7 @@ function getPageStructure() {
   return JSON.stringify(structure);
 }
 
+
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   console.log('Message received in content script:', request);
 
@@ -53,7 +62,8 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
           console.log('Step execution completed:', result);
           isExecutingStep = false;
           sendResponse({ status: "Step executed", result: result });
-          chrome.runtime.sendMessage({ action: "getNextStep" });
+          // Notify background script that step is completed and to get next step
+          chrome.runtime.sendMessage({ action: "stepCompleted", url: window.location.href });
         })
         .catch(error => {
           console.error('Error in executeStep:', error);
@@ -68,21 +78,28 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   } else if (request.action === "error") {
     console.error('Error received:', request.error);
     sendResponse({ status: "Error received" });
+  } else if (request.action === "pageLoaded") {
+    console.log('Page loaded, checking for ongoing task');
+    chrome.storage.local.get(['currentTask', 'taskCompleted'], (result) => {
+      if (result.currentTask && !result.taskCompleted) {
+        chrome.runtime.sendMessage({ action: "stepCompleted", url: window.location.href });
+      }
+    });
+    sendResponse({ status: "Page load handled" });
   }
 });
+
 
 async function executeStep(instruction, retries = 3) {
   console.log('Executing instruction:', instruction);
 
-  // 移除前缀的短横线和空格
   const cleanedInstruction = instruction.replace(/^-\s*/, '').trim();
   console.log('Cleaned instruction:', cleanedInstruction);
 
   const instructions = cleanedInstruction.split('\n').map(i => i.trim()).filter(i => i);
-  
+
   try {
     for (const singleInstruction of instructions) {
-      // 使用正则表达式解析动作和参数
       const match = singleInstruction.match(/^([a-zA-Z\s]+):\s*(.*)$/);
       if (!match) {
         throw new Error(`Unrecognized instruction format: ${singleInstruction}`);
@@ -98,7 +115,7 @@ async function executeStep(instruction, retries = 3) {
           switch (action) {
             case 'navigate to':
               result = await navigateTo(fullParams);
-              break;
+              return result; // 导航后立即返回，不执行其他指令
             case 'click':
               result = await clickElement(fullParams);
               break;
@@ -149,13 +166,11 @@ async function executeStep(instruction, retries = 3) {
   }
 }
 
-
 function navigateTo(url) {
   return new Promise((resolve) => {
     console.log(`Navigating to ${url}`);
     window.location.href = url;
-    // Add a delay to wait for the page to load completely
-    setTimeout(() => resolve(`Navigated to ${url}`), 5000);
+    // 不在这里解析 Promise，而是让页面加载事件来处理
   });
 }
 
@@ -196,10 +211,19 @@ async function selectOption(selectDescription, optionText) {
   throw new Error(`Select element not found: ${selectDescription}`);
 }
 
+/**
+ * 等待指定的毫秒数
+ * @param {number} milliseconds - 要等待的毫秒数
+ * @returns {Promise} 返回一个Promise对象，该对象在等待期满后解决
+ */
 function wait(milliseconds) {
+  // 创建一个新的Promise对象，用于异步操作的等待
   return new Promise((resolve) => {
+    // 打印等待开始的信息
     console.log(`Waiting for ${milliseconds} milliseconds`);
+    // 使用setTimeout函数来实现等待
     setTimeout(() => {
+      // 等待期满后，解决Promise，并打印等待结束的信息
       resolve(`Waited for ${milliseconds} milliseconds`);
     }, milliseconds);
   });
@@ -249,3 +273,8 @@ async function findElement(description) {
   console.log(`No element found for description: ${description}`);
   return null;
 }
+
+// Add a listener for page loads
+window.addEventListener('load', function () {
+  chrome.runtime.sendMessage({ action: "updateUrl", url: window.location.href });
+});
