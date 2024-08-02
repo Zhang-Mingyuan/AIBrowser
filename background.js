@@ -16,7 +16,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       taskCompleted: false
     }, () => {
       getNextStep();
-      sendResponse({status: "Task started"});
+      sendResponse({ status: "Task started" });
     });
   } else if (request.action === "stepCompleted") {
     chrome.storage.local.get(['currentStep', 'currentUrl'], (result) => {
@@ -25,12 +25,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         currentUrl: request.url
       }, () => {
         getNextStep();
-        sendResponse({status: "Getting next step"});
+        sendResponse({ status: "Getting next step" });
       });
     });
   } else if (request.action === "updateUrl") {
-    chrome.storage.local.set({currentUrl: request.url}, () => {
-      sendResponse({status: "URL updated"});
+    chrome.storage.local.set({ currentUrl: request.url }, () => {
+      sendResponse({ status: "URL updated" });
     });
   }
 
@@ -40,7 +40,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 chrome.webNavigation.onCompleted.addListener((details) => {
   if (details.frameId === 0) {  // Only execute for the main frame
     console.log('Page loaded:', details.url);
-    chrome.tabs.sendMessage(details.tabId, {action: "pageLoaded", url: details.url});
+    chrome.tabs.sendMessage(details.tabId, { action: "pageLoaded", url: details.url });
   }
 });
 
@@ -49,7 +49,7 @@ function getNextStep() {
   chrome.storage.local.get(['currentTask', 'currentStep', 'currentUrl', 'taskCompleted'], (result) => {
     if (result.taskCompleted) return;
 
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       if (chrome.runtime.lastError) {
         console.error('Error querying tabs:', chrome.runtime.lastError);
         return;
@@ -58,7 +58,7 @@ function getNextStep() {
         console.error('No active tab found');
         return;
       }
-      chrome.tabs.sendMessage(tabs[0].id, {action: "getPageContent"}, function(response) {
+      chrome.tabs.sendMessage(tabs[0].id, { action: "getPageContent" }, function (response) {
         if (chrome.runtime.lastError) {
           console.error('Error sending message to content script:', chrome.runtime.lastError);
           return;
@@ -73,7 +73,7 @@ function getNextStep() {
           .then(result => {
             console.log('API call result:', result);
             if (result.instructions.toLowerCase().includes('task completed')) {
-              chrome.storage.local.set({taskCompleted: true}, () => {
+              chrome.storage.local.set({ taskCompleted: true }, () => {
                 chrome.tabs.sendMessage(tabs[0].id, {
                   action: "executeStep",
                   instruction: "Task Completed"
@@ -131,7 +131,12 @@ async function getQwenInstructions(task, pageStructure, step, currentUrl) {
           - Select: <Element Description> option <Option Text>
           - Wait: <Milliseconds>
           - Scroll: <Pixels>
-          Only provide one step at a time. For element descriptions, use the most unique and specific identifier available (id, class, name, or text content). Prefer using text content for buttons and links when available.`
+            Only provide one step at a time. For element descriptions, use the most unique and specific identifier available (id, class, name, or text content). Always include appropriate selector prefixes:
+            - Use '#' for IDs (e.g., #submit-button)
+            - Use '.' for classes (e.g., .input-field)
+            - Use '[name=""]' for name attributes (e.g., [name="username"])
+            - Use no prefix for text content or generic descriptions
+          Prefer using text content for buttons and links when available.`
         },
         {
           role: "user",
@@ -171,7 +176,7 @@ async function getQwenInstructions(task, pageStructure, step, currentUrl) {
     }
 
     currentStep++;
-    return {instructions: instructions, rawResponse: JSON.stringify(data)};
+    return { instructions: instructions, rawResponse: JSON.stringify(data) };
   } catch (error) {
     console.error('Error in API call:', error);
     throw {

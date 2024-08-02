@@ -90,17 +90,18 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 });
 
 
-async function executeStep(instruction, retries = 3) {
+async function executeStep(instruction, retries = 1) {
   console.log('Executing instruction:', instruction);
 
   const cleanedInstruction = instruction.replace(/^-\s*/, '').trim();
   console.log('Cleaned instruction:', cleanedInstruction);
 
   const instructions = cleanedInstruction.split('\n').map(i => i.trim()).filter(i => i);
-
   try {
     for (const singleInstruction of instructions) {
-      const match = singleInstruction.match(/^([a-zA-Z\s]+):\s*(.*)$/);
+
+      const match = singleInstruction.match(/^[-\s]*([a-zA-Z\s]+):\s*(.*)$/);
+      console.log('singleInstruction:', singleInstruction)
       if (!match) {
         throw new Error(`Unrecognized instruction format: ${singleInstruction}`);
       }
@@ -181,7 +182,7 @@ async function clickElement(description) {
     element.click();
     return `Clicked element: ${description}`;
   }
-  throw new Error(`Element not found: ${description}`);
+  throw new Error(`Element not found or not clickable: ${description}`);
 }
 
 async function inputText(description, text) {
@@ -237,6 +238,77 @@ function scrollPage(pixels) {
   });
 }
 
+// async function findElement(description) {
+//   console.log(`Searching for element: ${description}`);
+
+//   // Function to check if element is visible
+//   const isVisible = (element) => {
+//     return !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+//   };
+
+//   // Handle ID selector
+//   if (description.startsWith('#')) {
+//     const element = document.getElementById(description.slice(1));
+//     if (element && isVisible(element)) return element;
+//   }
+
+//   // Handle class selector
+//   if (description.startsWith('.')) {
+//     const elements = document.getElementsByClassName(description.slice(1));
+//     for (let element of elements) {
+//       if (isVisible(element)) return element;
+//     }
+//   }
+
+//   // Handle name attribute
+//   if (description.startsWith('[name="') && description.endsWith('"]')) {
+//     const name = description.slice(7, -2);
+//     const elements = document.getElementsByName(name);
+//     for (let element of elements) {
+//       if (isVisible(element)) return element;
+//     }
+//   }
+
+//   // If no selector prefix, try various methods
+//   if (!description.startsWith('#') && !description.startsWith('.') && !description.startsWith('[')) {
+//     // Try to find by ID
+//     let element = document.getElementById(description);
+//     if (element && isVisible(element)) return element;
+
+//     // Try to find by class name
+//     const classElements = document.getElementsByClassName(description);
+//     for (let element of classElements) {
+//       if (isVisible(element)) return element;
+//     }
+
+//     // Try to find by name attribute
+//     const namedElements = document.getElementsByName(description);
+//     for (let element of namedElements) {
+//       if (isVisible(element)) return element;
+//     }
+
+//     // Find by text content (exact match)
+//     const allElements = document.body.getElementsByTagName('*');
+//     for (let element of allElements) {
+//       if (element.textContent.trim() === description && isVisible(element)) {
+//         return element;
+//       }
+//     }
+
+//     // If no exact match, use fuzzy matching
+//     const descriptionWords = description.toLowerCase().split(' ');
+//     for (let element of allElements) {
+//       const elementText = element.textContent.toLowerCase();
+//       if (descriptionWords.every(word => elementText.includes(word)) && isVisible(element)) {
+//         return element;
+//       }
+//     }
+//   }
+
+//   console.log(`No visible element found for description: ${description}`);
+//   return null;
+// }
+
 async function findElement(description) {
   console.log(`Searching for element: ${description}`);
 
@@ -244,11 +316,18 @@ async function findElement(description) {
   if (description.startsWith('#')) {
     const element = document.getElementById(description.slice(1));
     if (element) return element;
+  } else {
+    const element = document.getElementById(description);
+    if (element) return element;
   }
 
   // If the description starts with '.', it's a class
   if (description.startsWith('.')) {
     const element = document.querySelector(description);
+    if (element) return element;
+  } else {
+    let prefixDescription = '.' + description;
+    const element = document.querySelector(prefixDescription);
     if (element) return element;
   }
 
